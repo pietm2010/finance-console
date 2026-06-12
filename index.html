@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Finance Console</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">F</div>
+          <div>
+            <h1>Finance Console</h1>
+            <p>Live sheet dashboard</p>
+          </div>
+        </div>
+
+        <nav class="nav-tabs" aria-label="Dashboard views">
+          <button class="nav-tab active" data-view="overview" type="button">
+            <span>Overview</span>
+          </button>
+          <button class="nav-tab" data-view="cashflow" type="button">
+            <span>Cash Flow</span>
+          </button>
+          <button class="nav-tab" data-view="portfolio" type="button">
+            <span>Portfolio</span>
+          </button>
+          <button class="nav-tab" data-view="goals" type="button">
+            <span>Goals</span>
+          </button>
+          <button class="nav-tab" data-view="settings" type="button">
+            <span>Sources</span>
+          </button>
+        </nav>
+
+        <div class="source-box">
+          <div class="source-row">
+            <span>Connection</span>
+            <strong id="connectionState">Starting</strong>
+          </div>
+          <div class="source-row">
+            <span>Last refresh</span>
+            <strong id="lastRefresh">Never</strong>
+          </div>
+          <button class="primary-action" id="refreshButton" type="button">Refresh Data</button>
+        </div>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Personal finance</p>
+            <h2 id="viewTitle">Overview</h2>
+          </div>
+          <div class="filters">
+            <label>
+              <span>Month</span>
+              <select id="monthFilter"></select>
+            </label>
+            <label>
+              <span>Account</span>
+              <select id="accountFilter"></select>
+            </label>
+          </div>
+        </header>
+
+        <section class="status-banner" id="statusBanner" hidden></section>
+
+        <section class="view active" id="overviewView">
+          <div class="metric-grid">
+            <article class="metric">
+              <span>Total Income</span>
+              <strong id="incomeMetric">$0</strong>
+              <small id="incomeSub">Selected period</small>
+            </article>
+            <article class="metric">
+              <span>Total Spend</span>
+              <strong id="spendMetric">$0</strong>
+              <small id="spendSub">Selected period</small>
+            </article>
+            <article class="metric">
+              <span>Net Cash Flow</span>
+              <strong id="cashflowMetric">$0</strong>
+              <small id="cashflowSub">Income minus outflow</small>
+            </article>
+            <article class="metric">
+              <span>Portfolio Value</span>
+              <strong id="portfolioMetric">$0</strong>
+              <small id="portfolioSub">Latest stock overview</small>
+            </article>
+          </div>
+
+          <div class="dashboard-grid">
+            <section class="panel wide">
+              <div class="panel-heading">
+                <h3>Monthly Cash Flow</h3>
+                <span id="cashflowRange"></span>
+              </div>
+              <canvas id="cashflowChart" height="260"></canvas>
+            </section>
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Top Categories</h3>
+                <span id="categoryCount"></span>
+              </div>
+              <div id="categoryList" class="rank-list"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Latest Balances</h3>
+                <span id="balanceDate"></span>
+              </div>
+              <div id="balanceList" class="balance-list"></div>
+            </section>
+            <section class="panel wide">
+              <div class="panel-heading">
+                <h3>Recent Transactions</h3>
+                <span id="transactionCount"></span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Business</th>
+                      <th>Category</th>
+                      <th>Account</th>
+                      <th class="right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody id="transactionsTable"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="cashflowView">
+          <div class="dashboard-grid">
+            <section class="panel wide">
+              <div class="panel-heading">
+                <h3>Income vs Outflow</h3>
+                <span>By month</span>
+              </div>
+              <canvas id="incomeSpendChart" height="300"></canvas>
+            </section>
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Spend Mix</h3>
+                <span>Selected period</span>
+              </div>
+              <canvas id="categoryDonut" height="260"></canvas>
+            </section>
+            <section class="panel wide">
+              <div class="panel-heading">
+                <h3>Category Detail</h3>
+                <span id="categoryDetailCount"></span>
+              </div>
+              <div id="categoryDetail" class="detail-grid"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="portfolioView">
+          <div class="dashboard-grid">
+            <section class="panel wide">
+              <div class="panel-heading">
+                <h3>Portfolio Allocation</h3>
+                <span id="portfolioCount"></span>
+              </div>
+              <div id="portfolioBars" class="portfolio-bars"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Return Snapshot</h3>
+                <span>Current value</span>
+              </div>
+              <div id="returnSnapshot" class="rank-list"></div>
+            </section>
+            <section class="panel wide">
+              <div class="panel-heading">
+                <h3>Investment Value History</h3>
+                <span>Fidelity tab</span>
+              </div>
+              <canvas id="investmentChart" height="300"></canvas>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="goalsView">
+          <div class="dashboard-grid">
+            <section class="panel wide">
+              <div class="panel-heading">
+                <h3>Goal Progress</h3>
+                <span id="goalCount"></span>
+              </div>
+              <div id="goalsList" class="goals-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="settingsView">
+          <div class="dashboard-grid">
+            <section class="panel wide">
+              <div class="panel-heading">
+                <h3>Connected Sheet Tabs</h3>
+                <span id="sourceCount"></span>
+              </div>
+              <div id="sourcesList" class="sources-list"></div>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
