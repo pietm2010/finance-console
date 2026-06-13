@@ -63,6 +63,14 @@
               <span>Account</span>
               <select id="accountFilter"></select>
             </label>
+            <label>
+              <span>View</span>
+              <select id="ownerFilter">
+                <option value="all">Together</option>
+                <option value="MP">MP</option>
+                <option value="CW">Colette</option>
+              </select>
+            </label>
           </div>
         </header>
 
@@ -73,12 +81,12 @@
             <article class="metric">
               <span>Total Income</span>
               <strong id="incomeMetric">$0</strong>
-              <small id="incomeSub">Selected period</small>
+              <small id="incomeSub">Operating income</small>
             </article>
             <article class="metric">
               <span>Total Spend</span>
               <strong id="spendMetric">$0</strong>
-              <small id="spendSub">Selected period</small>
+              <small id="spendSub">Transfers and debt overlap removed</small>
             </article>
             <article class="metric">
               <span>Net Cash Flow</span>
@@ -126,6 +134,7 @@
                       <th>Date</th>
                       <th>Business</th>
                       <th>Category</th>
+                      <th>View</th>
                       <th>Account</th>
                       <th class="right">Amount</th>
                     </tr>
