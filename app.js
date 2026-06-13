@@ -1,17 +1,14 @@
 const SHEETS = {
-  bank: {
-    id: "1D3V6N7JK8lF8mC5HC5HBKIvCJucP-KqE5HVEjYSN5a8",
-    name: "Colette finances api",
-    tabs: {
-      transactions: { name: "BSA_Transactions", gid: "574254890", range: "A1:G1000" },
-      balances: { name: "BSA_Balances", gid: "1476465211", range: "A1:I1800" },
-      categories: { name: "BSA_Categories", gid: "1173775058", range: "A1:C1000" },
-    },
-  },
-  planning: {
+  main: {
     id: "1Bg59xJ73C74jtIfcZ6aIfljzOptn9pEfiS8PHzfyYu8",
     name: "mp bank transactions data for finances dashboard",
     tabs: {
+      transactions: { name: "BSA_Transactions", gid: "907895022", range: "A1:G32000" },
+      balances: { name: "BSA_Balances", gid: "1473575140", range: "A1:I3200" },
+      netWorth: { name: "All_In_One_New", gid: "1718468352", range: "A1:N1100" },
+      coletteIncome: { name: "Colette_Income", gid: "1727089453", range: "A1:B1000" },
+      coletteExpenses: { name: "Collette_Monthly_Expenses", gid: "9301581", range: "A1:F1000" },
+      coletteBalances: { name: "COLETTE", gid: "1832660909", range: "A1:F1000" },
       stocks: { name: "Stock Overview", gid: "91802090", range: "A1:M40" },
       stockHistory: { name: "Fidelity_Stocks", gid: "1160429676", range: "A1:Z200" },
       goals: { name: "Goals", gid: "26812576", range: "A1:L200" },
@@ -59,7 +56,7 @@ const state = {
   stocks: [],
   stockHistory: [],
   goals: [],
-  filters: { month: "all", account: "all" },
+  filters: { month: "all", account: "all", owner: "all" },
 };
 
 const views = {
@@ -71,6 +68,7 @@ const views = {
 };
 
 const colors = ["#27785d", "#326fa8", "#b17c2b", "#6d5b9d", "#b94b45", "#70806f", "#3f8589"];
+const OVERLAP_CATEGORIES = new Set(["Debt Payments", "Transfers In", "Transfers Out"]);
 
 document.addEventListener("DOMContentLoaded", () => {
   bindNavigation();
@@ -84,15 +82,23 @@ async function loadData() {
   showStatus("");
 
   try {
-    const [transactions, balances, stocks, stockHistory, goals] = await Promise.all([
-      fetchSheetRows(SHEETS.bank.id, SHEETS.bank.tabs.transactions),
-      fetchSheetRows(SHEETS.bank.id, SHEETS.bank.tabs.balances),
-      fetchSheetRows(SHEETS.planning.id, SHEETS.planning.tabs.stocks),
-      fetchSheetRows(SHEETS.planning.id, SHEETS.planning.tabs.stockHistory),
-      fetchSheetRows(SHEETS.planning.id, SHEETS.planning.tabs.goals),
+    const [transactions, balances, coletteIncome, coletteExpenses, stocks, stockHistory, goals] = await Promise.all([
+      fetchSheetRows(SHEETS.main.id, SHEETS.main.tabs.transactions),
+      fetchSheetRows(SHEETS.main.id, SHEETS.main.tabs.balances),
+      fetchSheetRows(SHEETS.main.id, SHEETS.main.tabs.coletteIncome),
+      fetchSheetRows(SHEETS.main.id, SHEETS.main.tabs.coletteExpenses),
+      fetchSheetRows(SHEETS.main.id, SHEETS.main.tabs.stocks),
+      fetchSheetRows(SHEETS.main.id, SHEETS.main.tabs.stockHistory),
+      fetchSheetRows(SHEETS.main.id, SHEETS.main.tabs.goals),
     ]);
 
-    state.transactions = normalizeTransactions(transactions);
+    const mpTransactions = normalizeTransactions(transactions, "MP");
+    state.transactions = mpTransactions;
+    state.transactions = [
+      ...mpTransactions,
+      ...normalizeColetteIncome(coletteIncome),
+      ...normalizeColetteExpenses(coletteExpenses),
+    ].sort((a, b) => b.Date - a.Date);
     state.balances = normalizeBalances(balances);
     state.stocks = normalizeStocks(stocks);
     state.stockHistory = normalizeStockHistory(stockHistory);
@@ -167,7 +173,7 @@ function gvizToRows(table) {
     .filter((row) => Object.values(row).some((value) => String(value).trim() !== ""));
 }
 
-function normalizeTransactions(rows) {
+function normalizeTransactions(rows, owner = "MP") {
   return rows
     .map((row) => ({
       Date: parseDate(row.Date),
@@ -175,10 +181,41 @@ function normalizeTransactions(rows) {
       Business: row.Business || "Unknown",
       Category: row.Category || "UNCATEGORIZED",
       Account: row.Account || "Unknown",
+      Owner: row.Owner || owner,
       Status: row.Status || "",
     }))
     .filter((row) => row.Date && Number.isFinite(row.Amount))
     .sort((a, b) => b.Date - a.Date);
+}
+
+function normalizeColetteIncome(rows) {
+  return rows
+    .map((row) => ({
+      Date: parseDate(row.Month),
+      Amount: money(row["Total Income"]),
+      Business: "Colette income",
+      Category: "Income",
+      Account: "Colette monthly summary",
+      Owner: "CW",
+      Status: "monthly-summary",
+    }))
+    .filter((row) => row.Date && Number.isFinite(row.Amount) && row.Amount !== 0);
+}
+
+function normalizeColetteExpenses(rows) {
+  const summaryMonth = latestMonthFromRows(state.transactions) || new Date();
+  return rows
+    .filter((row) => row.Amount && !String(row["Column 1"] || "").toLowerCase().includes("total"))
+    .map((row) => ({
+      Date: summaryMonth,
+      Amount: -Math.abs(money(row.Amount)),
+      Business: row["Column 1"] || row.Category || "Colette monthly expense",
+      Category: mapExpenseCategory(row["Column 1"] || row.Category || "Expense"),
+      Account: row.Card || "Colette monthly summary",
+      Owner: "CW",
+      Status: row["Auto / Manual"] || "monthly-summary",
+    }))
+    .filter((row) => row.Date && Number.isFinite(row.Amount) && row.Amount !== 0);
 }
 
 function normalizeBalances(rows) {
@@ -246,7 +283,8 @@ function normalizeGoals(rows) {
 
 function render() {
   const tx = filteredTransactions();
-  const totals = tx.reduce(
+  const operatingTx = tx.filter(isOperatingTransaction);
+  const totals = operatingTx.reduce(
     (acc, row) => {
       if (row.Amount >= 0) acc.income += row.Amount;
       else acc.spend += Math.abs(row.Amount);
@@ -261,7 +299,8 @@ function render() {
   text("cashflowMetric", currency(net));
   document.getElementById("cashflowMetric").className = net >= 0 ? "positive" : "negative";
   text("portfolioMetric", currency(sum(state.stocks, "Value")));
-  text("transactionCount", `${tx.length} rows`);
+  const excludedCount = tx.length - operatingTx.length;
+  text("transactionCount", `${tx.length} rows / ${excludedCount} overlap removed from totals`);
 
   renderCashflowCharts(tx);
   renderCategories(tx);
@@ -277,12 +316,13 @@ function filteredTransactions() {
     const monthKey = toMonthKey(row.Date);
     const monthMatch = state.filters.month === "all" || monthKey === state.filters.month;
     const accountMatch = state.filters.account === "all" || row.Account === state.filters.account;
-    return monthMatch && accountMatch;
+    const ownerMatch = state.filters.owner === "all" || row.Owner === state.filters.owner;
+    return monthMatch && accountMatch && ownerMatch;
   });
 }
 
 function renderCashflowCharts(transactions) {
-  const monthly = groupMonthly(state.transactions);
+  const monthly = groupMonthly(state.transactions.filter((row) => state.filters.owner === "all" || row.Owner === state.filters.owner).filter(isOperatingTransaction));
   const labels = monthly.map((row) => row.month);
   drawLineBars("cashflowChart", labels, monthly.map((row) => row.net), { label: "Net", color: "#27785d" });
   drawGroupedBars("incomeSpendChart", labels, monthly.map((row) => row.income), monthly.map((row) => row.spend));
@@ -292,6 +332,7 @@ function renderCashflowCharts(transactions) {
 function renderCategories(transactions) {
   const spendByCategory = Object.entries(
     transactions
+      .filter(isOperatingTransaction)
       .filter((row) => row.Amount < 0)
       .reduce((acc, row) => {
         acc[row.Category] = (acc[row.Category] || 0) + Math.abs(row.Amount);
@@ -338,6 +379,7 @@ function renderTransactions(transactions) {
         <td>${formatDate(row.Date)}</td>
         <td>${escapeHtml(row.Business)}</td>
         <td>${escapeHtml(row.Category)}</td>
+        <td>${escapeHtml(ownerLabel(row.Owner))}</td>
         <td>${escapeHtml(row.Account)}</td>
         <td class="right ${row.Amount >= 0 ? "positive" : "negative"}">${currency(row.Amount)}</td>
       </tr>`,
@@ -394,12 +436,13 @@ function renderGoals() {
 
 function renderSources() {
   const tabs = [
-    ["Transactions", SHEETS.bank.name, SHEETS.bank.tabs.transactions],
-    ["Balances", SHEETS.bank.name, SHEETS.bank.tabs.balances],
-    ["Categories", SHEETS.bank.name, SHEETS.bank.tabs.categories],
-    ["Stocks", SHEETS.planning.name, SHEETS.planning.tabs.stocks],
-    ["Stock History", SHEETS.planning.name, SHEETS.planning.tabs.stockHistory],
-    ["Goals", SHEETS.planning.name, SHEETS.planning.tabs.goals],
+    ["MP Transactions", SHEETS.main.name, SHEETS.main.tabs.transactions],
+    ["Balances", SHEETS.main.name, SHEETS.main.tabs.balances],
+    ["Colette Income", SHEETS.main.name, SHEETS.main.tabs.coletteIncome],
+    ["Colette Expenses", SHEETS.main.name, SHEETS.main.tabs.coletteExpenses],
+    ["Stocks", SHEETS.main.name, SHEETS.main.tabs.stocks],
+    ["Stock History", SHEETS.main.name, SHEETS.main.tabs.stockHistory],
+    ["Goals", SHEETS.main.name, SHEETS.main.tabs.goals],
   ];
   text("sourceCount", `${tabs.length} tabs`);
   document.getElementById("sourcesList").innerHTML = tabs
@@ -415,11 +458,13 @@ function renderSources() {
 function updateFilters() {
   const monthSelect = document.getElementById("monthFilter");
   const accountSelect = document.getElementById("accountFilter");
+  const ownerSelect = document.getElementById("ownerFilter");
   const months = [...new Set(state.transactions.map((row) => toMonthKey(row.Date)).filter(Boolean))].sort().reverse();
   const accounts = [...new Set(state.transactions.map((row) => row.Account).filter(Boolean))].sort();
 
   fillSelect(monthSelect, [["all", "All months"], ...months.map((month) => [month, month])], state.filters.month);
   fillSelect(accountSelect, [["all", "All accounts"], ...accounts.map((account) => [account, account])], state.filters.account);
+  ownerSelect.value = state.filters.owner;
 }
 
 function fillSelect(select, options, selected) {
@@ -451,6 +496,10 @@ function bindFilters() {
     state.filters.account = event.target.value;
     render();
   });
+  document.getElementById("ownerFilter").addEventListener("change", (event) => {
+    state.filters.owner = event.target.value;
+    render();
+  });
 }
 
 function groupMonthly(transactions) {
@@ -464,6 +513,34 @@ function groupMonthly(transactions) {
     return acc;
   }, {});
   return Object.values(grouped).sort((a, b) => a.month.localeCompare(b.month)).slice(-12);
+}
+
+function isOperatingTransaction(row) {
+  return !OVERLAP_CATEGORIES.has(row.Category);
+}
+
+function mapExpenseCategory(label) {
+  const value = String(label || "").toLowerCase();
+  if (value.includes("electric") || value.includes("internet") || value.includes("water") || value.includes("gas - consumers") || value.includes("phone")) return "Utilities";
+  if (value.includes("car") || value.includes("gas - car")) return "Transportation";
+  if (value.includes("grocery")) return "Groceries";
+  if (value.includes("restaurant")) return "Restaurants";
+  if (value.includes("medical")) return "Healthcare";
+  if (value.includes("self care")) return "Personal Care";
+  return "Household";
+}
+
+function latestMonthFromRows(rows) {
+  const dates = rows.map((row) => row.Date).filter(Boolean);
+  if (!dates.length) return null;
+  const latest = new Date(Math.max(...dates.map((date) => date.getTime())));
+  return new Date(latest.getFullYear(), latest.getMonth(), 1);
+}
+
+function ownerLabel(owner) {
+  if (owner === "CW") return "Colette";
+  if (owner === "MP") return "MP";
+  return "Together";
 }
 
 function drawLineBars(canvasId, labels, values, options) {
