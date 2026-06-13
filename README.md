@@ -4,18 +4,21 @@ A static personal finance dashboard that reads live data from Google Sheets and 
 
 ## What It Connects To
 
-The app is configured in `app.js` to read from these Google Sheets tabs:
+The app is configured in `app.js` to use the larger dashboard workbook as the source of truth, with MP, Colette, and Together views:
 
-- `Colette finances api`
+- `mp bank transactions data for finances dashboard`
   - `BSA_Transactions`
   - `BSA_Balances`
-  - `BSA_Categories`
-- `mp bank transactions data for finances dashboard`
+  - `Colette_Income`
+  - `Collette_Monthly_Expenses`
+  - `COLETTE`
   - `Stock Overview`
   - `Fidelity_Stocks`
   - `Goals`
 
 No private API keys, service account files, OAuth tokens, or credentials are included. The site reads public/client-accessible Google Sheets data through Google's visualization endpoint. If the sheets are private to your Google account, a deployed public site may fall back to demo data unless you publish/share the needed sheets appropriately.
+
+Operating cash flow intentionally excludes transfer and debt-payment overlap categories such as `Transfers In`, `Transfers Out`, and `Debt Payments` so credit-card payments and account moves do not double-count as normal spending.
 
 ## Run Locally
 
