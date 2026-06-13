@@ -1,0 +1,13 @@
+{
+  "name": "finance-console",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static finance dashboard connected to Google Sheets.",
+  "scripts": {
+    "dev": "npx serve .",
+    "build": "echo \"Static site ready\""
+  },
+  "devDependencies": {
+    "serve": "^14.2.5"
+  }
+}
