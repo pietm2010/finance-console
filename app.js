@@ -69,6 +69,7 @@ const views = {
 
 const colors = ["#27785d", "#326fa8", "#b17c2b", "#6d5b9d", "#b94b45", "#70806f", "#3f8589"];
 const OVERLAP_CATEGORIES = new Set(["Debt Payments", "Transfers In", "Transfers Out"]);
+const EARNED_INCOME_PATTERNS = ["payroll", "direct dep", "gusto", "galen", "sero mental", "digital strike", "kroger", "colette income"];
 
 document.addEventListener("DOMContentLoaded", () => {
   bindNavigation();
@@ -115,6 +116,7 @@ async function loadData() {
     console.warn(error);
   }
 
+  defaultToLatestMonth();
   updateFilters();
   render();
   setConnection(state.sourceMode);
@@ -286,8 +288,8 @@ function render() {
   const operatingTx = tx.filter(isOperatingTransaction);
   const totals = operatingTx.reduce(
     (acc, row) => {
-      if (row.Amount >= 0) acc.income += row.Amount;
-      else acc.spend += Math.abs(row.Amount);
+      if (row.Amount >= 0 && isEarnedIncome(row)) acc.income += row.Amount;
+      if (row.Amount < 0) acc.spend += Math.abs(row.Amount);
       return acc;
     },
     { income: 0, spend: 0 },
@@ -300,7 +302,8 @@ function render() {
   document.getElementById("cashflowMetric").className = net >= 0 ? "positive" : "negative";
   text("portfolioMetric", currency(sum(state.stocks, "Value")));
   const excludedCount = tx.length - operatingTx.length;
-  text("transactionCount", `${tx.length} rows / ${excludedCount} overlap removed from totals`);
+  const passiveIncomeCount = operatingTx.filter((row) => row.Amount > 0 && !isEarnedIncome(row)).length;
+  text("transactionCount", `${tx.length} rows / ${excludedCount} overlap removed / ${passiveIncomeCount} passive income rows not in income card`);
 
   renderCashflowCharts(tx);
   renderCategories(tx);
@@ -507,9 +510,14 @@ function groupMonthly(transactions) {
     const key = toMonthKey(row.Date);
     if (!key) return acc;
     acc[key] ||= { month: key, income: 0, spend: 0, net: 0 };
-    if (row.Amount >= 0) acc[key].income += row.Amount;
-    else acc[key].spend += Math.abs(row.Amount);
-    acc[key].net += row.Amount;
+    if (row.Amount >= 0 && isEarnedIncome(row)) {
+      acc[key].income += row.Amount;
+      acc[key].net += row.Amount;
+    }
+    if (row.Amount < 0) {
+      acc[key].spend += Math.abs(row.Amount);
+      acc[key].net += row.Amount;
+    }
     return acc;
   }, {});
   return Object.values(grouped).sort((a, b) => a.month.localeCompare(b.month)).slice(-12);
@@ -517,6 +525,21 @@ function groupMonthly(transactions) {
 
 function isOperatingTransaction(row) {
   return !OVERLAP_CATEGORIES.has(row.Category);
+}
+
+function isEarnedIncome(row) {
+  if (row.Category !== "Income") return false;
+  const business = String(row.Business || "").toLowerCase();
+  const account = String(row.Account || "").toLowerCase();
+  if (business.includes("dividend") || business.includes("interest") || account.includes("certificate")) return false;
+  return EARNED_INCOME_PATTERNS.some((pattern) => business.includes(pattern));
+}
+
+function defaultToLatestMonth() {
+  if (state.filters.month !== "all") return;
+  const months = [...new Set(state.transactions.map((row) => toMonthKey(row.Date)).filter(Boolean))].sort();
+  const latest = months[months.length - 1];
+  if (latest) state.filters.month = latest;
 }
 
 function mapExpenseCategory(label) {
