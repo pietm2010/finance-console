@@ -273,15 +273,10 @@ canvas {
 
 .rank-list,
 .balance-list,
-goals-list,
+.goals-list,
 .sources-list,
 .portfolio-bars,
 .detail-grid {
-  display: grid;
-  gap: 10px;
-}
-
-.goals-list {
   display: grid;
   gap: 10px;
 }
